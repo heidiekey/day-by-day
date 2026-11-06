@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-const URL='https://ajakdtcpxzlndadzvh.supabase.co';
+const URL='https://ajakdctpcpxzlndadzvh.supabase.co';
 const APIKEY='sb_publishable_ZkPq0vlNtcIZv58s5w14Yw_gJ94d_fj';
 const SESSION='day-by-day-session-v1', LOCAL='day-by-day-app-v1';
 let session=null, record=null, busy=false, authBusy=false, generation=0, conflict=null, timer;
