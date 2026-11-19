@@ -29,6 +29,25 @@ function valid(p){
  return p;
 }
 function saveRecord(){write(cacheKey(),record);}
+function rollToToday(p){
+ const next=clone(p);
+ if(next.date===day())return next;
+ next.date=day();
+ next.tasks=Array.isArray(next.tasks)?next.tasks.map(t=>({
+  ...t,
+  status:'pending',
+  started:null,
+  pausedAt:null,
+  actual:0,
+  recoveryReason:undefined,
+  history:[]
+ })):[];
+ next.target=8;
+ next.logged=0;
+ next.workTrackerVersion=2;
+ next.proposal=null;
+ return valid(next);
+}
 function view(){
  el('authForm').classList.toggle('hidden',!!session);
  el('signedIn').classList.toggle('hidden',!session);
@@ -86,8 +105,15 @@ async function sync(){
    record.base=rows[0].revision;record.pending=null;
    record.dirty=JSON.stringify(record.state)!==JSON.stringify(pending.plan);saveRecord();
   }else if(remote&&remote.revision!==record.base){
-   // The user might have edited the plan while the read was in flight.
-   if(!record.dirty){valid(remote.plan);record={state:clone(remote.plan),base:remote.revision,dirty:false,pending:null};saveRecord();applyPlan(record.state);}
+    // The user might have edited the plan while the read was in flight.
+    if(!record.dirty){
+     const remoteBeforeDate=remote.plan.date;
+     const remotePlan=rollToToday(remote.plan);
+     const rolledForward=remotePlan.date!==remoteBeforeDate;
+     record={state:clone(remotePlan),base:remote.revision,dirty:rolledForward,pending:null};
+     saveRecord();applyPlan(record.state);
+     if(rolledForward){clearTimeout(timer);timer=setTimeout(sync,100);}
+    }
   }
   message(record.dirty?'New changes waiting to sync.':'Up to date · '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
  }catch(e){
@@ -115,7 +141,17 @@ async function auth(create){
 async function openAccount(){
  const cached=read(cacheKey());
  record=cached||{state:fresh(),base:0,dirty:false,pending:null};
- try{applyPlan(record.state);}catch{message('Stored account plan could not be opened. Sign out and keep your backup.');return;}
+ try{
+  const beforeDate=record.state.date;
+  const rolled=rollToToday(record.state);
+  if(rolled.date!==beforeDate){
+   record.state=clone(rolled);
+   record.dirty=true;
+   record.pending=null;
+   saveRecord();
+  }
+  applyPlan(record.state);
+ }catch{message('Stored account plan could not be opened. Sign out and keep your backup.');return;}
  view();message('Checking your account…');await sync();
 }
 async function signOut(){
