@@ -25,28 +25,27 @@ function valid(p){
  }
  for(const key of ['target','logged'])if(!Number.isFinite(p[key])||p[key]<0)throw Error('Invalid work hours.');
  if(p.proposal){if(!Array.isArray(p.proposal.changes)||!p.proposal.changes.every(c=>ids.has(c.id)&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.old)&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.next)))throw Error('Invalid schedule proposal.');}
+
+ if(p.todos!==undefined){
+  if(!Array.isArray(p.todos)||p.todos.length>300)throw Error('Too many to-dos.');
+  const todoIds=new Set();
+  for(const t of p.todos){
+   if(!Number.isSafeInteger(t.id)||t.id<0||todoIds.has(t.id)||typeof t.name!=='string'||t.name.length>200||!['once','daily','weekday'].includes(t.repeat)||!['pending','done'].includes(t.status)||!(t.at===null||t.at===undefined||/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t.at)))throw Error('Invalid to-do.');
+   todoIds.add(t.id);
+  }
+ }
+ if(p.todoHistory!==undefined){
+  if(!Array.isArray(p.todoHistory)||p.todoHistory.length>120)throw Error('Too many previous to-dos.');
+  for(const t of p.todoHistory){
+   if(!Number.isSafeInteger(t.id)||typeof t.name!=='string'||t.name.length>200||!/^\d{4}-\d{2}-\d{2}$/.test(t.day)||!['pending','done'].includes(t.status))throw Error('Invalid past to-do.');
+  }
+ }
  if(new TextEncoder().encode(JSON.stringify(p)).length>900000)throw Error('Plan is too large. Save a backup.');
  return p;
 }
 function saveRecord(){write(cacheKey(),record);}
 function rollToToday(p){
- const next=clone(p);
- if(next.date===day())return next;
- next.date=day();
- next.tasks=Array.isArray(next.tasks)?next.tasks.map(t=>({
-  ...t,
-  status:'pending',
-  started:null,
-  pausedAt:null,
-  actual:0,
-  recoveryReason:undefined,
-  history:[]
- })):[];
- next.target=8;
- next.logged=0;
- next.workTrackerVersion=2;
- next.proposal=null;
- return valid(next);
+ return valid(advancePlan(p));
 }
 function view(){
  el('authForm').classList.toggle('hidden',!!session);
